@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>段考大屏畫面</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        body { font-family: "Microsoft JhengHei", sans-serif; overflow: hidden; background-color: #f1f5f9; }
+        .digital-time-container {
+            display: flex; align-items: center; justify-content: center;
+            background: #ffffff; border: 3px solid #cbd5e1; border-radius: 12px;
+            padding: 6px 12px; min-width: 200px;
+        }
+        .digital-time-input {
+            font-family: 'Courier New', monospace; font-size: 2.8vw; font-weight: 900;
+            width: 100%; text-align: center; outline: none; background: transparent; color: #1e293b;
+        }
+        .subject-input {
+            font-size: 2.2vw; font-weight: 900; border-bottom: 3px solid #cbd5e1;
+            width: 100%; outline: none; background: transparent; padding-bottom: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar { width: 10px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 5px; }
+        .row-height { height: 130px; flex-shrink: 0; }
+        .progress-fill { transition: width 1s linear; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const EXAM_MESSAGES = ["考卷寫上班級姓名座號", "有問題舉手問老師", "不會寫的題目先跳過", "耐心、細心、小心", "檢查完才可趴下休息"];
+        const STUDY_MESSAGES = ["保持絕對安靜，不影響他人", "專心複習，不交頭接耳", "珍惜時間，做最後衝刺", "有不懂的安靜思考"];
+        const BREAK_MESSAGES = ["等老師點完名再離開座位", "準備下科文具", "提早上廁所喝水", "桌面淨空，保持安靜"];
+        const LUNCH_MESSAGE = "午餐及午休時間安靜休息";
+
+        const App = () => {
+            const [now, setNow] = useState(new Date());
+            const [schedule, setSchedule] = useState(() => {
+                const saved = localStorage.getItem('exam_v11_data');
+                // 預設 8 節課，中間會動態判定午休
+                return saved ? JSON.parse(saved) : Array(8).fill(null).map((_, i) => ({
+                    id: i + 1,
+                    type: 'exam',
+                    subject: "",
+                    start: i < 4 ? `0${8+i}:00` : `${9+i}:00`, // 簡單避開午休
+                    end: i < 4 ? `0${8+i}:40` : `${9+i}:40`
+                }));
+            });
+            const [attendance, setAttendance] = useState({ should: "", actual: "", absent: "" });
+
+            useEffect(() => {
+                const timer = setInterval(() => setNow(new Date()), 1000);
+                return () => clearInterval(timer);
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('exam_v11_data', JSON.stringify(schedule));
+            }, [schedule]);
+
+            const status = useMemo(() => {
+                const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+                
+                // 檢查是否在午休 (假設第4節結束到第5節開始之間是午休)
+                // 這裡我們抓取第4節 end 和第5節 start
+                const s4 = schedule[3];
+                const s5 = schedule[4];
+                const [, , , , e4h, e4m] = s4.end.match(/(\d+):(\d+)/).map(Number);
+                const [, , , , s5h, s5m] = s5.start.match(/(\d+):(\d+)/).map(Number);
+                const end4Sec = s4 ? (parseInt(s4.end.split(':')[0])*3600 + parseInt(s4.end.split(':')[1])*60) : 0;
+                const start5Sec = s5 ? (parseInt(s5.start.split(':')[0])*3600 + parseInt(s5.start.split(':')[1])*60) : 0;
+
+                if (nowSec >= end4Sec && nowSec < start5Sec) {
+                    const dur = start5Sec - end4Sec;
+                    const elap = nowSec - end4Sec;
+                    return { index: -2, percent: (elap/dur*100), type: 'lunch', label: '午休時間' };
+                }
+
+                const idx = schedule.findIndex(s => {
+                    const [h, m] = s.start.split(':').map(Number);
+                    const [eh, em] = s.end.split(':').map(Number);
+                    return nowSec >= (h * 3600 + m * 60) && nowSec < (eh * 3600 + em * 60);
+                });
+
+                if (idx === -1) return { index: -1, percent: 0, type: 'none', label: '休息' };
+
+                const s = schedule[idx];
+                const startTotal = parseInt(s.start.split(':')[0])*3600 + parseInt(s.start.split(':')[1])*60;
+                const endTotal = parseInt(s.end.split(':')[0])*3600 + parseInt(s.end.split(':')[1])*60;
+                const percent = ((nowSec - startTotal) / (endTotal - startTotal)) * 100;
+
+                return { 
+                    index: idx, 
+                    percent: Math.min(100, Math.max(0, percent)), 
+                    type: s.type, 
+                    label: `第 ${idx + 1} 節 ${s.type === 'exam' ? '考試' : '自習'}中` 
+                };
+            }, [now, schedule]);
+
+            const currentMessage = useMemo(() => {
+                if (status.type === 'lunch') return LUNCH_MESSAGE;
+                if (status.index === -1) return BREAK_MESSAGES[Math.floor(now.getSeconds() / 8) % BREAK_MESSAGES.length];
+                const msgs = status.type === 'exam' ? EXAM_MESSAGES : STUDY_MESSAGES;
+                return msgs[Math.floor(now.getSeconds() / 8) % msgs.length];
+            }, [status, now]);
+
+            return (
+                <div className="flex flex-col h-screen w-screen bg-slate-100">
+                    <div className="h-[25vh] bg-white border-b-8 border-slate-200 flex items-center px-10 shadow-lg z-20">
+                        <div className="w-[35%] text-center border-r-4 border-slate-50">
+                            <div className="text-2xl font-black text-slate-400">現在時間</div>
+                            <div className="text-[9vw] font-black text-blue-600 tabular-nums leading-none">{now.toTimeString().substring(0, 8)}</div>
+                        </div>
+                        <div className="flex-1 px-16 text-center">
+                            <div className="text-[4vw] font-black mb-4 text-slate-800">{status.label}</div>
+                            <div className="w-full h-14 bg-slate-100 rounded-full border-4 border-slate-200 overflow-hidden shadow-inner">
+                                <div 
+                                    className={`h-full progress-fill ${status.type === 'exam' ? 'bg-emerald-500' : status.type === 'study' ? 'bg-blue-500' : 'bg-orange-400'}`}
+                                    style={{ width: `${status.percent}%` }}
+                                ></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 flex overflow-hidden">
+                        <div className="w-[65%] bg-white border-r-4 border-slate-300 flex flex-col">
+                            <div className="flex-1 overflow-y-auto custom-scroll p-6 space-y-4">
+                                {schedule.map((slot, idx) => (
+                                    <React.Fragment key={idx}>
+                                        <div className={`row-height flex items-center px-8 rounded-3xl border-4 transition-all ${status.index === idx ? 'bg-blue-50 border-blue-400 shadow-md' : 'bg-white border-slate-100'}`}>
+                                            <div className="flex flex-col items-center mr-6">
+                                                <span className="text-lg font-black text-slate-300 mb-1">{idx + 1}</span>
+                                                <button 
+                                                    onClick={() => {
+                                                        const ns = [...schedule];
+                                                        ns[idx].type = ns[idx].type === 'exam' ? 'study' : 'exam';
+                                                        setSchedule(ns);
+                                                    }}
+                                                    className={`px-4 py-1 rounded-full text-white font-black text-sm shadow-sm ${slot.type === 'exam' ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                                                >
+                                                    {slot.type === 'exam' ? '考試' : '自習'}
+                                                </button>
+                                            </div>
+                                            <div className="w-[160px] mr-10"><input type="text" value={slot.subject} onChange={(e) => { const ns = [...schedule]; ns[idx].subject = e.target.value; setSchedule(ns); }} className="subject-input" placeholder="名稱" /></div>
+                                            <div className="flex-1 flex items-center justify-end gap-4">
+                                                <div className="digital-time-container"><input type="text" value={slot.start} onChange={(e) => { const ns = [...schedule]; ns[idx].start = e.target.value; setSchedule(ns); }} className="digital-time-input" /></div>
+                                                <span className="text-3xl font-black text-slate-300 px-2">至</span>
+                                                <div className="digital-time-container"><input type="text" value={slot.end} onChange={(e) => { const ns = [...schedule]; ns[idx].end = e.target.value; setSchedule(ns); }} className="digital-time-input" /></div>
+                                            </div>
+                                        </div>
+                                        {idx === 3 && (
+                                            <div className="py-2 flex items-center justify-center">
+                                                <div className="h-[2px] bg-slate-200 flex-1"></div>
+                                                <span className="mx-4 text-slate-400 font-bold text-sm">午休時間</span>
+                                                <div className="h-[2px] bg-slate-200 flex-1"></div>
+                                            </div>
+                                        )}
+                                    </React.Fragment>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="w-[35%] flex flex-col bg-[#fffef7]">
+                            <div className="flex-1 flex flex-col items-center justify-center p-10 text-center border-b-4 border-slate-100">
+                                <span className={`px-6 py-2 rounded-xl text-white font-black text-xl mb-6 shadow-md ${status.type === 'exam' ? 'bg-emerald-500' : status.type === 'study' ? 'bg-blue-500' : status.type === 'lunch' ? 'bg-rose-400' : 'bg-orange-400'}`}>
+                                    {status.type === 'exam' ? '考試叮嚀' : status.type === 'study' ? '自習提示' : status.type === 'lunch' ? '午修時間' : '休息提示'}
+                                </span>
+                                <div className="text-[4.2vw] font-black text-slate-700 leading-tight">{currentMessage}</div>
+                            </div>
+                            <div className="h-[360px] p-6 grid grid-cols-2 gap-4 bg-white shadow-inner">
+                                <div className="bg-blue-50 rounded-3xl border-2 border-blue-100 flex flex-col items-center justify-center p-4">
+                                    <span className="text-xl font-bold text-blue-800 mb-2">應到人數</span>
+                                    <input type="text" className="bg-transparent text-6xl font-black text-blue-900 w-full text-center outline-none" value={attendance.should} onChange={e=>setAttendance({...attendance, should:e.target.value})} placeholder="0" />
+                                </div>
+                                <div className="bg-emerald-50 rounded-3xl border-2 border-emerald-100 flex flex-col items-center justify-center p-4">
+                                    <span className="text-xl font-bold text-emerald-800 mb-2">實到人數</span>
+                                    <input type="text" className="bg-transparent text-6xl font-black text-emerald-900 w-full text-center outline-none" value={attendance.actual} onChange={e=>setAttendance({...attendance, actual:e.target.value})} placeholder="0" />
+                                </div>
+                                <div className="col-span-2 bg-rose-50 rounded-3xl border-2 border-rose-100 p-4 flex flex-col items-center">
+                                    <span className="text-xl font-bold text-rose-800 mb-1">未到名單 / 座號</span>
+                                    <textarea className="bg-transparent text-3xl font-black text-rose-600 w-full text-center outline-none resize-none" value={attendance.absent} onChange={e=>setAttendance({...attendance, absent:e.target.value})} placeholder="無" rows="2" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
