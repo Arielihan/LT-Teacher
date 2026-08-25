@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>115-1 學期日曆與動態課程進度查詢系統</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary-color: #1b365d;
+      --accent-color: #007bff;
+    }
+    body { background-color: #f4f6f9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .card-custom { border: none; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); background: white; }
+    .day-cell { cursor: pointer; transition: all 0.2s ease; position: relative; min-height: 85px; }
+    .day-cell:hover { background-color: #e9ecef !important; transform: translateY(-2px); }
+    .day-cell.active-day { border: 2px solid #007bff !important; background-color: #e7f1ff !important; }
+    .badge-class { font-size: 0.72rem; margin-top: 2px; display: block; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 3px 5px; }
+    .timeline-item { position: relative; padding-left: 20px; margin-bottom: 12px; border-left: 2px solid #dee2e6; }
+    .timeline-item::before { content: ''; position: absolute; left: -5px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-color); }
+    .timeline-item.cancelled::before { background: #dc3545; }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+    <div class="container-fluid px-4">
+      <a class="navbar-brand fw-bold" href="#"><i class="fa-solid fa-calendar-days me-2"></i>115-1 學期 每日對照行事曆與課表系統 (v4 最新修正版)</a>
+    </div>
+  </nav>
+
+  <div class="container-fluid px-4 my-4">
+
+    <!-- 頁籤分頁 -->
+    <ul class="nav nav-pills mb-4" id="mainTab" role="tablist">
+      <li class="nav-item">
+        <button class="nav-link active fw-bold" id="cal-grid-tab" data-bs-toggle="tab" data-bs-target="#cal-grid-view" type="button">
+          <i class="fa-solid fa-calendar-grid me-2"></i>全學期每日行事曆 (直接於格內顯示進度週數)
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link fw-bold" id="class-tab" data-bs-toggle="tab" data-bs-target="#class-view" type="button">
+          <i class="fa-solid fa-users me-2"></i>各班別授課節數與逐週進度
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+
+      <!-- Tab 1: 全學期每日行事曆網格 -->
+      <div class="tab-pane fade show active" id="cal-grid-view">
+        <div class="row">
+          <div class="col-lg-8 mb-4">
+            <div class="card card-custom p-3">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold m-0"><i class="fa-solid fa-calendar me-2"></i>21 週日曆（格內直接標示：進度第幾週）</h5>
+                <span class="small text-muted"><i class="fa-solid fa-hand-pointer me-1"></i>點選日期即可在右側查看單元詳細內容與說明</span>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-bordered align-middle text-center mb-0" style="table-layout: fixed;">
+                  <thead class="table-dark">
+                    <tr>
+                      <th style="width: 7%;">週</th>
+                      <th style="width: 13.2%;">週一</th>
+                      <th style="width: 13.2%;">週二</th>
+                      <th style="width: 13.2%;">週三</th>
+                      <th style="width: 13.2%;">週四</th>
+                      <th style="width: 13.2%;">週五</th>
+                      <th style="width: 13.5%;" class="bg-secondary">週六</th>
+                      <th style="width: 13.5%;" class="bg-secondary">週日</th>
+                    </tr>
+                  </thead>
+                  <tbody id="fullCalendarGrid"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右側：當天課程與單元詳情 -->
+          <div class="col-lg-4">
+            <div class="card card-custom p-4 sticky-top" style="top: 80px;" id="dayDetailPanel">
+              <h5 class="fw-bold text-primary mb-3"><i class="fa-solid fa-clock me-2"></i>請點選左側日期</h5>
+              <p class="text-muted">點選行事曆中的任何一天，將在此顯示當天有課的班級、節次、應上到的**單元內容**與補充活動。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: 各班別逐週進度 -->
+      <div class="tab-pane fade" id="class-view">
+        <div class="row">
+          <div class="col-md-3 mb-3">
+            <div class="card card-custom p-3">
+              <h6 class="fw-bold mb-3 border-bottom pb-2"><i class="fa-solid fa-list me-2"></i>選擇班級</h6>
+              <div class="list-group" id="classListGroup"></div>
+            </div>
+          </div>
+          <div class="col-md-9">
+            <div class="card card-custom p-4" id="classDetailContent"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // 七年級與八年級大綱
+    const g7Syllabus = [
+      { id: 1, unit: "課程準備與簡介", content: "說明課程目標、評量方式、課堂常規、氣球車搭建。" },
+      { id: 2, unit: "設計思考", content: "設計思考方法論瞭解與應用。" },
+      { id: 3, unit: "設計思考", content: "氣球車草圖製作規劃與進行氣球車製作。" },
+      { id: 4, unit: "設計思考", content: "增強氣球車、測試與調整至最佳狀態、氣球車測驗。" },
+      { id: 5, unit: "製圖與繪圖", content: "立體圖(等角圖/等斜圖)概念與手繪練習。" },
+      { id: 6, unit: "製圖與繪圖", content: "三視圖(前/上/側視)與正投影原理手繪。" },
+      { id: 7, unit: "製圖與繪圖", content: "三視圖正投影與立體圖互轉練習。" },
+      { id: 8, unit: "製圖與繪圖", content: "Tinkercad 介面與基本操作、旋轉群組。" },
+      { id: 9, unit: "製圖與繪圖", content: "Tinkercad 繪製指定物件，手繪與電繪比較。" },
+      { id: 10, unit: "微型建築椅", content: "微型建築椅設計草圖、尺寸規劃與三視圖。" },
+      { id: 11, unit: "微型建築椅", content: "常用手工具名稱、功能、安全操作與材料裁切。" },
+      { id: 12, unit: "微型建築椅", content: "微型建築椅組裝、結構修正、穩固度測試。" },
+      { id: 13, unit: "微型建築椅", content: "組裝完成、作品發表與互評。" },
+      { id: 14, unit: "機構與結構 (橋樑)", content: "常見建築結構類型、受力機制與結構框架。" },
+      { id: 15, unit: "機構與結構 (橋樑)", content: "搭建達文西橋、結構承載實驗。" },
+      { id: 16, unit: "機構與結構 (機構)", content: "凸輪、連桿、齒輪等機構及生活應用。" },
+      { id: 17, unit: "機構與結構 (機構)", content: "凸輪機構極限與變形操作、隨動件影響。" },
+      { id: 18, unit: "凸輪玩具", content: "凸輪玩具主題發想、設計圖與凸輪形狀繪製。" },
+      { id: 19, unit: "凸輪玩具", content: "Onshape 軟體介紹、輪軸與切割圖繪製。" },
+      { id: 20, unit: "凸輪玩具", content: "雷射切割機操作與安全規範、零件切割與組裝。" },
+      { id: 21, unit: "凸輪玩具", content: "動作調整、美化、最終測試與作品發表。" }
+    ];
+
+    const g8Syllabus = [
+      { id: 1, unit: "課程準備與簡介", content: "課程目標、評量方式、主題挑戰、學習單與破冰。" },
+      { id: 2, unit: "電腦輔助設計 (2D)", content: "2D 繪圖軟體介面、基本操作與線條圖形工具。" },
+      { id: 3, unit: "電腦輔助設計 (2D)", content: "尺寸標註規則、依尺寸繪製圖樣練習。" },
+      { id: 4, unit: "電腦輔助設計 (2D)", content: "依提供圖樣進行繪製練習與評量。" },
+      { id: 5, unit: "電腦輔助設計 (3D)", content: "Onshape 介面、參數式建模、與Tinkercad差異。" },
+      { id: 6, unit: "電腦輔助設計 (3D)", content: "草圖(Sketch)繪製、尺寸約束與伸長(Extrude)。" },
+      { id: 7, unit: "電腦輔助設計 (3D)", content: "完成 3D 建模作品、修改模型問題與檢討。" },
+      { id: 8, unit: "能源與發電", content: "再生與非再生能源種類、各發電優缺點分析。" },
+      { id: 9, unit: "能源與發電", content: "手搖發電機設計規劃與製作。" },
+      { id: 10, unit: "能源與發電", content: "手搖發電機製作、測試與修正。" },
+      { id: 11, unit: "科技產品 (電路)", content: "基本電學：電壓、電流、電阻與 LED 認識與配置。" },
+      { id: 12, unit: "科技產品 (電路)", content: "焊接練習、工具與安全操作。" },
+      { id: 13, unit: "科技產品 (光劍)", content: "光劍電路規劃、造型設計與外殼裁切。" },
+      { id: 14, unit: "科技產品 (光劍)", content: "依設計圖焊接光劍電路與組裝。" },
+      { id: 15, unit: "科技產品 (光劍)", content: "光劍測試、除錯、美化與作品發表。" },
+      { id: 16, unit: "動力與機械", content: "TT馬達、齒輪、軸承動力傳動原理。" },
+      { id: 17, unit: "動力與機械", content: "線控車線路設定、設計圖與車體繪製。" },
+      { id: 18, unit: "動力與機械", content: "車體材料測量、裁切加工與結構組裝。" },
+      { id: 19, unit: "動力與機械", content: "車體組裝、TT馬達與軸承動力系統安裝。" },
+      { id: 20, unit: "動力與機械", content: "線控車線路測試、調整與除錯練習。" },
+      { id: 21, unit: "動力與機械", content: "線控車情境挑戰 / 競賽。" }
+    ];
+
+    // 13 個班級課表設定
+    const classes = [
+      { id: "8-1B", grade: 8, name: "8-1B (科技)", day: 4, p: 1, mode: "weekly" },
+      { id: "7-4A", grade: 7, name: "7-4A (生活科技)", day: 1, p: 2, mode: "weekly" },
+      { id: "8-3B", grade: 8, name: "8-3B (科技)", day: 1, p: 3, mode: "weekly" },
+      { id: "8-2B", grade: 8, name: "8-2B (科技)", day: 2, p: 2, mode: "weekly" },
+      { id: "074", grade: 7, name: "074(1) (生活科技)", day: 3, p: 2, mode: "odd" },
+      { id: "7-1A", grade: 7, name: "7-1A (生活科技)", day: 3, p: 3, mode: "weekly" },
+      { id: "084", grade: 8, name: "084(2) (科技)", day: 3, p: 4, mode: "weekly" },
+      { id: "072", grade: 7, name: "072(1) (生活科技)", day: 4, p: 2, mode: "odd" },
+      { id: "071", grade: 7, name: "071(1) (生活科技)", day: 4, p: 2, mode: "even" },
+      { id: "7-2A", grade: 7, name: "7-2A (生活科技)", day: 4, p: 4, mode: "weekly" },
+      { id: "082", grade: 8, name: "082(2) (科技)", day: 5, p: 1, mode: "weekly" },
+      { id: "8-4B", grade: 8, name: "8-4B (科技)", day: 5, p: 3, mode: "weekly" },
+      { id: "7-3A", grade: 7, name: "7-3A (生活科技)", day: 5, p: 4, mode: "weekly" }
+    ];
+
+    // 生成 21 週日期資料 (從 2026-08-31 起算)
+    const weeksFullData = [];
+    let startDate = new Date(2026, 7, 31); // 2026-08-31 (Mon)
+
+    for (let w = 1; w <= 21; w++) {
+      let weekObj = { weekNum: w, type: (w % 2 !== 0 ? 'O' : 'E'), days: [] };
+      for (let d = 1; d <= 7; d++) {
+        let dateStr = `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}-${String(startDate.getDate()).padStart(2,'0')}`;
+        let monthDayStr = `${startDate.getMonth()+1}/${startDate.getDate()}`;
+        weekObj.days.push({
+          dateStr: dateStr,
+          monthDayStr: monthDayStr,
+          dayOfWeek: d, // 1=Mon, 7=Sun
+          weekNum: w,
+          weekType: weekObj.type
+        });
+        startDate.setDate(startDate.getDate() + 1);
+      }
+      weeksFullData.push(weekObj);
+    }
+
+    // 最新爬山與放假規則 (更新)
+    function getCancelReason(cls, weekNum, dayOfWeek, dateStr) {
+      if (cls.mode === "odd" && weekNum % 2 === 0) return "雙週輪空(不排課)";
+      if (cls.mode === "even" && weekNum % 2 !== 0) return "單週輪空(不排課)";
+
+      // 開學日全校大會活動（早上1,2節停課）
+      if (dateStr === "2026-08-31" && cls.day === 1 && cls.p <= 2) {
+        return "開學典禮 (全校活動停課)";
+      }
+
+      // 國定假日與校慶
+      if (dayOfWeek === 1 && weekNum === 5) return "9/28 中秋/教師節補假";
+      if (dayOfWeek === 1 && weekNum === 9) return "10/26 光復節補假";
+      if (dayOfWeek === 5 && weekNum === 4) return "9/25 中秋節連假";
+      if (dayOfWeek === 5 && weekNum === 6) return "10/9 國慶日連假";
+      if (dayOfWeek === 5 && weekNum === 15) return "12/11 校慶停課";
+      if (dayOfWeek === 5 && weekNum === 17) return "12/25 行憲紀念日連假";
+      if (dayOfWeek === 5 && weekNum === 18) return "1/1 元旦連假";
+
+      // 登山活動更新：
+      // 8-1B 和 8-2B: 10/26 ~ 10/29 放假去登山 (注意 10/26 剛好也是國定假日)
+      if ((cls.id === "8-1B" || cls.id === "8-2B") && (dateStr >= "2026-10-26" && dateStr <= "2026-10-29")) {
+        return "10/26~10/29 登山活動放假";
+      }
+
+      // 8-3B 和 8-4B: 10/27 ~ 10/30 放假去登山
+      if ((cls.id === "8-3B" || cls.id === "8-4B") && (dateStr >= "2026-10-27" && dateStr <= "2026-10-30")) {
+        return "10/27~10/30 登山活動放假";
+      }
+
+      // 082(2) 與 084(2) 那一週正常上課，不需放假
+
+      return null;
+    }
+
+    // 計算截至特定日期，特定班級實際上到了第幾節進度
+    function calculateClassLessonOnDate(cls, targetDateStr) {
+      let lessonCount = 0;
+      let targetFound = false;
+      let statusToday = null;
+
+      for (let wObj of weeksFullData) {
+        for (let day of wObj.days) {
+          if (day.dayOfWeek === cls.day) { // 是該班的上課星期
+            let cancel = getCancelReason(cls, day.weekNum, day.dayOfWeek, day.dateStr);
+            if (!cancel) {
+              lessonCount++;
+            }
+            if (day.dateStr === targetDateStr) {
+              targetFound = true;
+              statusToday = cancel ? { isClass: false, reason: cancel } : { isClass: true, lessonNum: lessonCount };
+              break;
+            }
+          }
+        }
+        if (targetFound) break;
+      }
+
+      return statusToday;
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      renderCalendarGrid();
+      renderClassBtns();
+      // 預設點擊開學日 8/31
+      showDayDetails("2026-08-31");
+      selectClass(classes[0]);
+    });
+
+    // 渲染 21 週全日曆網格
+    function renderCalendarGrid() {
+      const tbody = document.getElementById('fullCalendarGrid');
+      let html = '';
+
+      weeksFullData.forEach(w => {
+        html += `<tr>`;
+        html += `<td class="fw-bold bg-light align-middle">W${w.weekNum}<br><span class="badge ${w.type==='O'?'bg-info':'bg-warning'}">${w.type}</span></td>`;
+        
+        w.days.forEach(d => {
+          let isWeekend = d.dayOfWeek >= 6;
+          // 找出當天有課的班級
+          let todayClasses = classes.filter(c => c.day === d.dayOfWeek);
+          let badgesHtml = '';
+          
+          todayClasses.forEach(c => {
+            let status = calculateClassLessonOnDate(c, d.dateStr);
+            if (!status.isClass) {
+              badgesHtml += `<span class="badge bg-danger badge-class">${c.id}: 停課</span>`;
+            } else {
+              badgesHtml += `<span class="badge ${c.grade===7?'bg-primary':'bg-success'} badge-class">${c.id} (第${status.lessonNum}週進度)</span>`;
+            }
+          });
+
+          // 補充備註 (如開學典禮、國定假日)
+          let noteHtml = '';
+          if (d.dateStr === "2026-08-31") noteHtml = `<div class="small text-danger fw-bold mt-1" style="font-size:0.65rem;">🎉開學典禮</div>`;
+          if (d.dateStr === "2026-09-25") noteHtml = `<div class="small text-danger fw-bold mt-1" style="font-size:0.65rem;">🌕中秋連假</div>`;
+          if (d.dateStr === "2026-09-28") noteHtml = `<div class="small text-danger fw-bold mt-1" style="font-size:0.65rem;">教師節補假</div>`;
+
+          html += `
+            <td class="day-cell align-top p-1 ${isWeekend?'bg-light text-muted':''}" id="td-${d.dateStr}" onclick="showDayDetails('${d.dateStr}')">
+              <div class="fw-bold text-start border-bottom pb-1" style="font-size: 0.85rem;">${d.monthDayStr}</div>
+              ${badgesHtml}
+              ${noteHtml}
+            </td>
+          `;
+        });
+
+        html += `</tr>`;
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    // 點擊日期顯示當日詳情
+    function showDayDetails(dateStr) {
+      document.querySelectorAll('.day-cell').forEach(el => el.classList.remove('active-day'));
+      const activeTd = document.getElementById(`td-${dateStr}`);
+      if (activeTd) activeTd.classList.add('active-day');
+
+      // 搜尋該日資訊
+      let dayObj = null;
+      for (let w of weeksFullData) {
+        let found = w.days.find(d => d.dateStr === dateStr);
+        if (found) { dayObj = found; break; }
+      }
+
+      const panel = document.getElementById('dayDetailPanel');
+      let classesToday = classes.filter(c => c.day === dayObj.dayOfWeek);
+
+      let html = `
+        <div class="border-bottom pb-2 mb-3">
+          <span class="badge bg-dark mb-1">第 ${dayObj.weekNum} 週 (${dayObj.weekType==='O'?'單週':'雙週'})</span>
+          <h4 class="fw-bold text-primary m-0"><i class="fa-solid fa-calendar-day me-2"></i>${dateStr} (星期${['一','二','三','四','五','六','日'][dayObj.dayOfWeek-1]})</h4>
+        </div>
+      `;
+
+      // 特殊活動提示
+      if (dateStr === "2026-08-31") {
+        html += `
+          <div class="alert alert-danger py-2 mb-3 small">
+            <i class="fa-solid fa-bell me-1"></i><strong>重要補充活動：</strong> 開學日早上第 1、2 節舉辦【開學典禮】，班級停課一次！
+          </div>
+        `;
+      }
+
+      if (classesToday.length === 0 || dayObj.dayOfWeek >= 6) {
+        html += `<p class="text-muted"><i class="fa-solid fa-mug-hot me-2"></i>當天無排定科技/生活科技課程（週末或無課日）。</p>`;
+      } else {
+        html += `<h6 class="fw-bold mb-3"><i class="fa-solid fa-chalkboard-user me-2"></i>今日授課班級與進度狀況：</h6>`;
+        
+        classesToday.forEach(c => {
+          let status = calculateClassLessonOnDate(c, dateStr);
+          let syllabus = c.grade === 7 ? g7Syllabus : g8Syllabus;
+
+          if (!status.isClass) {
+            html += `
+              <div class="card mb-2 border-danger bg-light p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="fw-bold text-danger">${c.name} (第${c.p}節)</span>
+                  <span class="badge bg-danger">停課/輪空</span>
+                </div>
+                <div class="small text-muted mt-1">因【${status.reason}】停課，該班進度順延。</div>
+              </div>
+            `;
+          } else {
+            let unitObj = syllabus.find(s => s.id === status.lessonNum) || { unit: "學期複習/成果展示", content: "課程總結與成果發表。" };
+            html += `
+              <div class="card mb-2 border-primary p-3">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-1 mb-2">
+                  <span class="fw-bold text-dark">${c.name} (第${c.p}節)</span>
+                  <span class="badge bg-success">推進至第 ${status.lessonNum} 週進度</span>
+                </div>
+                <div class="fw-bold text-primary">【${unitObj.unit}】</div>
+                <div class="small text-muted mt-1">${unitObj.content}</div>
+              </div>
+            `;
+          }
+        });
+      }
+
+      panel.innerHTML = html;
+    }
+
+    function renderClassBtns() {
+      const container = document.getElementById('classListGroup');
+      container.innerHTML = classes.map((c, idx) => `
+        <button class="list-group-item list-group-item-action border-0 mb-1 rounded d-flex justify-content-between align-items-center ${idx === 0 ? 'active' : ''}" onclick="changeClass('${c.id}', this)">
+          <div>
+            <div class="fw-bold">${c.name}</div>
+            <small class="${idx === 0 ? 'text-white-50' : 'text-muted'}">第${c.p}節 (週${c.day})</small>
+          </div>
+          <span class="badge ${c.grade === 7 ? 'bg-primary' : 'bg-success'}">${c.grade}年級</span>
+        </button>
+      `).join('');
+    }
+
+    function changeClass(id, btn) {
+      document.querySelectorAll('#classListGroup button').forEach(b => {
+        b.classList.remove('active');
+        b.querySelector('small').className = 'text-muted';
+      });
+      btn.classList.add('active');
+      btn.querySelector('small').className = 'text-white-50';
+      const cls = classes.find(c => c.id === id);
+      selectClass(cls);
+    }
+
+    function selectClass(cls) {
+      const card = document.getElementById('classDetailContent');
+      const syllabus = cls.grade === 7 ? g7Syllabus : g8Syllabus;
+
+      let heldCount = 0;
+      let cancelCount = 0;
+      let timelineHtml = '';
+      let currentLesson = 1;
+
+      weeksFullData.forEach(wObj => {
+        let dayObj = wObj.days[cls.day - 1];
+        let cancelReason = getCancelReason(cls, wObj.weekNum, cls.day, dayObj.dateStr);
+
+        if (cancelReason) {
+          cancelCount++;
+          timelineHtml += `
+            <div class="timeline-item cancelled">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-danger">第 ${wObj.weekNum} 週 (${dayObj.monthDayStr})</span>
+                <span class="badge bg-danger">${cancelReason}</span>
+              </div>
+              <div class="small text-muted mt-1">此週停課／輪空，進度順延。</div>
+            </div>
+          `;
+        } else {
+          heldCount++;
+          const currentUnit = syllabus.find(s => s.id === currentLesson) || { unit: "學期複習/成果展示", content: "課程總結與成果發表。" };
+          timelineHtml += `
+            <div class="timeline-item">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="fw-bold text-primary">第 ${wObj.weekNum} 週 (${dayObj.monthDayStr}) — 進度第 ${currentLesson} 週</span>
+                <span class="badge bg-success">正常上課</span>
+              </div>
+              <div class="fw-bold text-dark mt-1">【${currentUnit.unit}】</div>
+              <div class="small text-muted">${currentUnit.content}</div>
+            </div>
+          `;
+          currentLesson++;
+        }
+      });
+
+      card.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+          <div>
+            <h3 class="fw-bold text-dark mb-1">${cls.name}</h3>
+            <span class="badge ${cls.grade === 7 ? 'bg-primary' : 'bg-success'} me-2">${cls.grade}年級大綱</span>
+            <span class="badge bg-secondary"><i class="fa-solid fa-clock me-1"></i>上課時間：星期${cls.day} 第${cls.p}節</span>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded text-center border">
+              <div class="text-muted small">全學期總週數</div>
+              <div class="fs-4 fw-bold text-dark">21 週</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded text-center border">
+              <div class="text-muted small">扣除放假/活動/輪空</div>
+              <div class="fs-4 fw-bold text-danger">${cancelCount} 節</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="p-3 bg-light rounded text-center border">
+              <div class="text-muted small">實際推進進度</div>
+              <div class="fs-4 fw-bold text-success">${heldCount} 節</div>
+            </div>
+          </div>
+        </div>
+
+        <h6 class="fw-bold mb-3"><i class="fa-solid fa-list-check me-2"></i>逐週推進進度清單（共推進至第 ${heldCount} 週進度）</h6>
+        <div class="ps-2">
+          ${timelineHtml}
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>
