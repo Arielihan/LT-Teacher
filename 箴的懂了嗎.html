@@ -735,6 +735,8 @@ function commitIdentity(name, team, zh, isOnboard){
    渲染
    ===================================================================== */
 function renderAll(){
+   // 👇 加這行：只有當 state.vt 為 true 時才顯示 vtBanner，否則隱藏
+  document.getElementById("vtBanner").hidden = !state.vt;
   const bn=document.getElementById("vtBanner");
   if(bn){ bn.hidden=!(state&&state.vt); const ex=document.getElementById("vtExit"); if(ex) ex.onclick=exitVTPreview; }
   renderStats(); renderToday(); renderRank(); renderMe();
