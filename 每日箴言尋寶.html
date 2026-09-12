@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>每日箴言尋寶</title>
+<title>箴的懂了嗎？</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700;900&display=swap">
@@ -311,6 +311,8 @@ textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
 .name-pick b{font-size:16px;font-weight:700}
 .name-pick span{font-size:12px;color:var(--ink-soft)}
 .link-back{border:none;background:none;color:var(--ink-soft);font-size:13px;padding:0 0 6px;cursor:pointer}
+.vt-entry{margin-top:18px;width:100%;border:1px dashed var(--line);background:transparent;color:var(--ink-soft);border-radius:12px;padding:12px;font-size:13px;font-weight:600;cursor:pointer}
+.vt-entry:hover{border-color:var(--gold);color:var(--gold)}
 .nf-card{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}
 .mem-wrap{display:flex;flex-wrap:wrap;gap:6px}
 .mem-chip{display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:5px 6px 5px 11px;font-size:13px;font-weight:600}
@@ -332,6 +334,8 @@ textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
 .vt-ok{color:var(--sage);font-size:11px;font-weight:700}
 .vt-no{color:var(--fire);font-size:11px;font-weight:700}
 .vt-tag{font-size:11px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:99px;padding:2px 8px}
+.vt-banner{margin-top:12px;background:var(--gold-soft);border:1px solid color-mix(in srgb,var(--gold) 34%,transparent);border-radius:12px;padding:9px 12px;font-size:13px;font-weight:600;color:var(--gold);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.vt-banner button{margin-left:auto;border:none;background:var(--gold);color:#fff;border-radius:99px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer}
 
 /* ---------- 慶祝 ---------- */
 #confetti{position:fixed;inset:0;pointer-events:none;z-index:60;display:none}
@@ -361,7 +365,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:18px 0}
       <div class="brand">
         <span class="logo">📜</span>
         <div>
-          <div class="name">每日箴言尋寶</div>
+          <div class="name">箴的懂了嗎？</div>
           <div class="sub" id="brandSub">智慧比銀子更值得尋找</div>
         </div>
       </div>
@@ -377,6 +381,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:18px 0}
 </header>
 
 <main class="wrap">
+  <div id="vtBanner" class="vt-banner" hidden>👁️ VT 預覽模式 · 不計分、不上傳 <button id="vtExit">結束預覽</button></div>
   <!-- 今日 -->
   <section id="view-today"></section>
   <!-- 排行 -->
@@ -529,7 +534,7 @@ const Store = {
 };
 const DB = {
   loadState(){ const r=Store.get("proverbs.state"); return r?JSON.parse(r):null; },
-  saveState(s){ Store.set("proverbs.state", JSON.stringify(s)); Cloud.push("student",s); },
+  saveState(s){ if(s&&s.vt) return; Store.set("proverbs.state", JSON.stringify(s)); Cloud.push("student",s); },
   loadQuestions(){ const r=Store.get("proverbs.questions"); return r?JSON.parse(r):SEED_QUESTIONS.slice(); },
   saveQuestions(q){ Store.set("proverbs.questions", JSON.stringify(q)); Cloud.push("questions",q); },
   loadConfig(){ const r=Store.get("proverbs.config"); return r?JSON.parse(r):{START_DATE:CONFIG.START_DATE}; },
@@ -679,8 +684,10 @@ function groupStepHTML(title, lead){
     <div class="field"><label>你的小組</label><div class="chips grp" id="grpPick">${groups}</div></div>`;
 }
 function openOnboarding(){
-  showSheet(groupStepHTML("歡迎來尋寶 📜","每天讀一章箴言、答一題、打一次卡。先選你在哪一組："), false);
+  showSheet(groupStepHTML("歡迎來尋寶 📜","每天讀一章箴言、答一題、打一次卡。先選你在哪一組：")
+    + `<button class="vt-entry" id="vtEntry">我是 VT / 輔導 → 進入管理與看板</button>`, false);
   document.querySelectorAll("#grpPick .chip-pick").forEach(b=>b.onclick=()=>showNameStep(b.dataset.g,true));
+  document.getElementById("vtEntry").onclick=()=>askAdmin();
 }
 // 步驟二：從該組名單點自己的名字（或新增）
 function showNameStep(groupName, isOnboard){
@@ -727,7 +734,24 @@ function commitIdentity(name, team, zh, isOnboard){
 /* =====================================================================
    渲染
    ===================================================================== */
-function renderAll(){ renderStats(); renderToday(); renderRank(); renderMe(); }
+function renderAll(){
+  const bn=document.getElementById("vtBanner");
+  if(bn){ bn.hidden=!(state&&state.vt); const ex=document.getElementById("vtExit"); if(ex) ex.onclick=exitVTPreview; }
+  renderStats(); renderToday(); renderRank(); renderMe();
+}
+// VT 預覽：用學生畫面看題目，但不計分、不上傳、不進排行
+function enterVTPreview(){
+  state={ sid:"vt-preview", name:"VT（預覽）", team:(roster[0]&&roster[0].name)||"", zh:"", vt:true,
+          points:0, streak:0, longest:0, lastCheckin:null, answered:0, correct:0, days:{}, badges:[] };
+  document.getElementById("statsBar").hidden=false;
+  closeSheet(); renderAll(); switchTab("today");
+}
+function exitVTPreview(){
+  state=null;
+  document.getElementById("statsBar").hidden=true;
+  document.getElementById("vtBanner").hidden=true;
+  openOnboarding();
+}
 
 function renderStats(){
   document.getElementById("stStreak").textContent=state.streak;
@@ -925,10 +949,10 @@ function renderRank(){
 }
 // 我 + 全班（雲端連線時用真實資料；單機時用範例同學）
 function allPeople(){
-  const me={name:state.name,team:state.team,points:state.points,streak:state.streak,me:true};
+  const me = state.vt ? null : {name:state.name,team:state.team,points:state.points,streak:state.streak,me:true};
   if(Cloud.on){
     const list=(cloudStudents||[]).map(s=>({name:s.name||"(未命名)",team:s.team||"",points:s.points||0,streak:s.streak||0,me:s.sid===state.sid}));
-    if(!list.some(p=>p.me)) list.push(me);   // 自己還沒同步上去前，先顯示自己
+    if(me && !list.some(p=>p.me)) list.push(me);   // 自己還沒同步上去前，先顯示自己
     return list;
   }
   const T=runtimeConfig.TEAMS;
@@ -942,12 +966,19 @@ function allPeople(){
     {name:"小樂",team:T[2]||"C",points:60,streak:1},
     {name:"Amy",team:T[3]||"D",points:35,streak:1},
   ].map(d=>({...d,me:false}));
-  return [me,...demo];
+  return me?[me,...demo]:demo;
 }
 
 /* ---------- 成就 ---------- */
 function renderMe(){
   const host=document.getElementById("view-me");
+  if(state.vt){
+    host.innerHTML=`<div class="card" style="margin-top:18px"><div class="eyebrow">👁️ VT 預覽模式</div>
+      <p style="margin:10px 0 0">你正在預覽學生畫面，<b>這裡的作答不計分、不會上傳</b>。到「今日」看今天的題目，點進度可以看前幾天。</p>
+      <button class="btn" id="vtExit2" style="margin-top:14px">結束 VT 預覽</button></div>`;
+    document.getElementById("vtExit2").onclick=exitVTPreview;
+    return;
+  }
   const {cur,nxt}=levelOf(state.points);
   const prog = nxt ? Math.min(100,Math.round((state.points-cur.min)/(nxt.min-cur.min)*100)) : 100;
   const badgeHtml=BADGES.map(b=>{
@@ -1128,7 +1159,8 @@ function adminPanel(){
 
   showSheet(`
     <h2>VT 管理 ⚙️</h2>
-    <h2 style="font-size:18px;margin-top:8px">📊 教師看板</h2>
+    <button class="btn ghost" id="vtPreview" style="margin-top:12px">👁️ 預覽學生畫面／今天的題目（不計分）</button>
+    <h2 style="font-size:18px;margin-top:16px">📊 教師看板</h2>
     <p class="lead small" style="margin:6px 0 10px">全班即時進度、今天誰還沒做。</p>
     ${renderVTDashboard()}
     <hr class="sep">
@@ -1166,11 +1198,10 @@ function adminPanel(){
         ? '<b style="color:var(--sage)">已連線 ✓</b>　名單、題庫、全班分數都會即時同步。'
         : '<b>未連線</b>（目前存在這台裝置）。填好檔案裡的 firebaseConfig、把 CLOUD_ENABLED 改成 true 後就會連上。'}
     </div>
-    ${Cloud.on ? `
-      <button class="btn ghost" id="cloudSeed" style="margin-top:10px">⬆️ 第一次設定：上傳名單＋題庫到雲端</button>
-      <button class="btn ghost" id="cloudSyncQ" style="margin-top:8px">🔄 用檔案內建題庫更新雲端題目（加了新題目後按）</button>
-      <button class="btn ghost" id="cloudClear" style="margin-top:8px;color:var(--wrong)">🗑️ 清空全班分數（測試完重設用）</button>
-    ` : ''}
+    <button class="btn ghost" id="cloudSeed" style="margin-top:10px" ${Cloud.on?'':'disabled'}>⬆️ 第一次設定：上傳名單＋題庫到雲端</button>
+    <button class="btn ghost" id="cloudSyncQ" style="margin-top:8px" ${Cloud.on?'':'disabled'}>🔄 用檔案內建題庫更新雲端題目（加了新題目後按）</button>
+    <button class="btn ghost" id="cloudClear" style="margin-top:8px;color:var(--wrong)" ${Cloud.on?'':'disabled'}>🗑️ 清空全班分數（測試完重設用）</button>
+    ${Cloud.on?'':'<div class="footnote" style="margin-top:8px;text-align:left">↑ 這三顆要在 github.io 上、雲端「已連線 ✓」後才能按（Claude 預覽視窗連不上雲端，所以是灰色的）。</div>'}
     <div class="footnote" style="margin-top:16px">💡 之後要加整個月的題目：把題目給 Claude 加進檔案的 SEED_QUESTIONS，重新上傳檔案，再按上面的「🔄」一次即可（名單與分數不受影響）。</div>
   `);
   const cs=document.getElementById("cloudSeed"); if(cs) cs.onclick=()=>Cloud.seedAll();
@@ -1195,6 +1226,7 @@ function adminPanel(){
     DB.saveConfig({START_DATE:runtimeConfig.START_DATE}); alert("開始日期已儲存 ✓"); renderAll();
   };
   bindRosterEdit();
+  const vp=document.getElementById("vtPreview"); if(vp) vp.onclick=enterVTPreview;
   const vr=document.getElementById("vtRefresh"); if(vr) vr.onclick=()=>adminPanel();
   // 刪除
   document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
@@ -1238,6 +1270,7 @@ function closeSheet(){
   if(document.getElementById("overlay").dataset.dismiss==="0" && !state) return; // 報名未完成不可關
   document.getElementById("overlay").classList.remove("show");
   const host=document.getElementById("view-today"); if(host) delete host.dataset.viewDay;
+  if(!state) openOnboarding();   // VT 看完管理、沒有學生身分 → 回到報名畫面
 }
 function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
