@@ -646,8 +646,6 @@ function boot(){
   document.getElementById("overlay").onclick=e=>{ if(e.target.id==="overlay") closeSheet(); };
   if(!state){ openOnboarding(); }
   else { document.getElementById("statsBar").hidden=false; renderAll(); }
-  // VT 專屬入口：網址結尾加 #vt（或 #admin）就會跳出管理密碼視窗
-  if(location.hash && /vt|admin/i.test(location.hash)) askAdmin();
 }
 
 /* ---------- 主題 ---------- */
@@ -686,9 +684,10 @@ function groupStepHTML(title, lead){
     <div class="field"><label>你的小組</label><div class="chips grp" id="grpPick">${groups}</div></div>`;
 }
 function openOnboarding(){
-  const ab=document.getElementById("adminBtn"); if(ab) ab.hidden=true;   // 學生畫面看不到任何 VT 入口
-  showSheet(groupStepHTML("歡迎來尋寶 📜","每天讀一章箴言、答一題、打一次卡。先選你在哪一組："), false);
+  showSheet(groupStepHTML("歡迎來尋寶 📜","每天讀一章箴言、答一題、打一次卡。先選你在哪一組：")
+    + `<button class="vt-entry" id="vtEntry">我是 VT / 輔導 → 進入管理與看板</button>`, false);
   document.querySelectorAll("#grpPick .chip-pick").forEach(b=>b.onclick=()=>showNameStep(b.dataset.g,true));
+  document.getElementById("vtEntry").onclick=()=>askAdmin();
 }
 // 步驟二：從該組名單點自己的名字（或新增）
 function showNameStep(groupName, isOnboard){
@@ -738,30 +737,20 @@ function commitIdentity(name, team, zh, isOnboard){
 function renderAll(){
   const bn=document.getElementById("vtBanner");
   if(bn){ bn.hidden=!(state&&state.vt); const ex=document.getElementById("vtExit"); if(ex) ex.onclick=exitVTPreview; }
-  // 齒輪只在 VT 預覽時出現（好回管理）；學生與報名畫面一律隱藏。VT 從專屬網址 #vt 進入
-  const ab=document.getElementById("adminBtn"); if(ab) ab.hidden = !(state && state.vt);
   renderStats(); renderToday(); renderRank(); renderMe();
 }
 // VT 預覽：用學生畫面看題目，但不計分、不上傳、不進排行
-let prevStateBeforeVT=null;
 function enterVTPreview(){
-  prevStateBeforeVT = (state && !state.vt) ? state : null;   // 記住原本身分（萬一是從學生畫面進來）
   state={ sid:"vt-preview", name:"VT（預覽）", team:(roster[0]&&roster[0].name)||"", zh:"", vt:true,
           points:0, streak:0, longest:0, lastCheckin:null, answered:0, correct:0, days:{}, badges:[] };
   document.getElementById("statsBar").hidden=false;
   closeSheet(); renderAll(); switchTab("today");
 }
 function exitVTPreview(){
+  state=null;
+  document.getElementById("statsBar").hidden=true;
   document.getElementById("vtBanner").hidden=true;
-  if(prevStateBeforeVT){          // 原本是學生 → 回到學生畫面
-    state=prevStateBeforeVT; prevStateBeforeVT=null;
-    document.getElementById("statsBar").hidden=false;
-    renderAll(); switchTab("today");
-  } else {                        // 原本是 VT（從報名頁進來）→ 回報名頁
-    state=null;
-    document.getElementById("statsBar").hidden=true;
-    openOnboarding();
-  }
+  openOnboarding();
 }
 
 function renderStats(){
