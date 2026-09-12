@@ -317,6 +317,21 @@ textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
 .mem-chip i{font-style:normal;color:var(--ink-soft);font-weight:400;font-size:12px}
 .mem-chip button{border:none;background:var(--line);color:var(--ink);width:18px;height:18px;border-radius:50%;font-size:13px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0}
 .mem-chip button:hover{background:var(--wrong);color:#fff}
+/* 教師看板 */
+.vt-sum{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+.vt-s{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:10px 6px;text-align:center}
+.vt-s b{font-family:var(--serif);font-size:22px;display:block;line-height:1.1}
+.vt-s span{font-size:11px;color:var(--ink-soft)}
+.vt-group{margin-bottom:12px}
+.vt-gname{font-weight:700;font-size:13px;color:var(--gold);letter-spacing:.5px;margin:0 0 6px;padding-bottom:4px;border-bottom:1px solid var(--line)}
+.vt-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:7px 2px;border-bottom:1px dashed var(--line);flex-wrap:wrap}
+.vt-row:last-child{border-bottom:none}
+.vt-row.off{opacity:.55}
+.vt-nm{font-weight:700;font-size:14px}
+.vt-st{font-size:11.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+.vt-ok{color:var(--sage);font-size:11px;font-weight:700}
+.vt-no{color:var(--fire);font-size:11px;font-weight:700}
+.vt-tag{font-size:11px;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:99px;padding:2px 8px}
 
 /* ---------- 慶祝 ---------- */
 #confetti{position:fixed;inset:0;pointer-events:none;z-index:60;display:none}
@@ -351,7 +366,7 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:18px 0}
         </div>
       </div>
       <button class="icon-btn" id="themeBtn" title="切換深淺色" aria-label="切換深淺色">🌙</button>
-      <button class="icon-btn" id="adminBtn" title="老師管理" aria-label="老師管理">⚙️</button>
+      <button class="icon-btn" id="adminBtn" title="VT 管理" aria-label="VT 管理">⚙️</button>
     </div>
     <div class="stats" id="statsBar" hidden>
       <div class="stat fire"><div class="big"><span id="stStreak">0</span>🔥</div><div class="lab">連續打卡</div></div>
@@ -565,9 +580,16 @@ const Cloud = {
     this.db.doc("meta/config").set({START_DATE:runtimeConfig.START_DATE},{merge:true});
     alert("已把名單、題庫、開始日期上傳到雲端 ✓ 之後全班就會同步。");
   },
+  async clearAllStudents(){   // 老師：清空全班分數（保留名單與題庫）
+    if(!this.on) throw new Error("雲端未連線");
+    const snap=await this.db.collection("students").get();
+    const batch=this.db.batch();
+    snap.forEach(d=>batch.delete(d.ref));
+    await batch.commit();
+  },
 };
 // 只把「排行榜需要」的欄位放上雲端；個人回應(reflection)不上傳，保持私密
-function pubStudent(s){ return { sid:s.sid, name:s.name||"", zh:s.zh||"", team:s.team||"", points:s.points||0, streak:s.streak||0, longest:s.longest||0, answered:s.answered||0, correct:s.correct||0, updated:Date.now() }; }
+function pubStudent(s){ return { sid:s.sid, name:s.name||"", zh:s.zh||"", team:s.team||"", points:s.points||0, streak:s.streak||0, longest:s.longest||0, answered:s.answered||0, correct:s.correct||0, lastCheckin:s.lastCheckin||null, updated:Date.now() }; }
 
 /* =====================================================================
    工具：日期(台灣)、種子亂數(每人打亂選項)
@@ -744,7 +766,7 @@ function renderToday(){
   if(!q){
     host.innerHTML=`<div class="card"><div class="eyebrow">📖 今日靈糧</div>
       <h2 class="section-title">第 ${cd} 天的題目還沒放上來</h2>
-      <p class="muted">老師還在準備今天的箴言，晚點再來看看 🙏</p></div>
+      <p class="muted">VT 還在準備今天的箴言，晚點再來看看 🙏</p></div>
       <div class="card"><div class="eyebrow">📅 我的進度</div><div class="days">${chips}</div></div>`;
     bindDayChips(host); return;
   }
@@ -958,8 +980,17 @@ function renderMe(){
       <div class="eyebrow">🙋 我是誰</div>
       <p style="margin:10px 0 0">名字：<b>${esc(state.name)}</b>${state.zh?` <span class="muted">（${esc(state.zh)}）</span>`:''}　小組：<b>${esc(state.team)}</b></p>
       <button class="btn ghost" id="resetBtn" style="margin-top:14px">換組 / 換名字</button>
+      <button class="btn ghost" id="wipeBtn" style="margin-top:8px;color:var(--wrong)">清除這台紀錄，重新開始</button>
     </div>`;
   document.getElementById("resetBtn").onclick=()=>editProfile();
+  document.getElementById("wipeBtn").onclick=resetDevice;
+}
+function resetDevice(){
+  if(!confirm("清除『這台裝置』的所有紀錄、回到報名畫面重新開始？分數會歸零。")) return;
+  if(Cloud.on && state){ try{ Cloud.db.doc("students/"+state.sid).delete(); }catch(e){} }
+  try{ localStorage.removeItem("proverbs.state"); }catch(e){}
+  delete mem["proverbs.state"];
+  location.reload();
 }
 function editProfile(){ openEditGroupStep(); }
 function openEditGroupStep(){
@@ -978,6 +1009,55 @@ function checkBadges(){
 /* =====================================================================
    老師管理面板
    ===================================================================== */
+/* ---------- 教師看板 ---------- */
+function fmtAgo(ts){
+  if(!ts) return "—";
+  const s=Math.floor((Date.now()-ts)/1000);
+  if(s<60) return "剛剛"; if(s<3600) return Math.floor(s/60)+" 分前";
+  if(s<86400) return Math.floor(s/3600)+" 小時前"; return Math.floor(s/86400)+" 天前";
+}
+function renderVTDashboard(){
+  if(!Cloud.on){
+    return `<div class="demo-note" style="margin-top:0">👀 教師看板要<b>雲端連線</b>才能看全班。若你在 Claude 預覽視窗看是正常的——放到 github.io 用瀏覽器打開就會連上。</div>`;
+  }
+  const today=todayTW();
+  const parts=cloudStudents||[];
+  const doneToday=parts.filter(p=>p.lastCheckin===today).length;
+  let html=`<div class="vt-sum">
+      <div class="vt-s"><b>${parts.length}</b><span>已參加</span></div>
+      <div class="vt-s"><b style="color:var(--sage)">${doneToday}</b><span>今天已打卡</span></div>
+      <div class="vt-s"><b style="color:var(--fire)">${Math.max(0,parts.length-doneToday)}</b><span>今天還沒做</span></div>
+    </div>`;
+  const used=new Set();
+  roster.forEach(g=>{
+    const rows=g.members.map(m=>{
+      const cs=parts.find(p=>p.team===g.name && !used.has(p.sid) && (p.name===m.en || p.name===m.zh));
+      if(cs) used.add(cs.sid);
+      const label=m.en||m.zh;
+      if(!cs) return `<div class="vt-row off"><span class="vt-nm">${esc(label)}</span><span class="vt-tag">尚未加入</span></div>`;
+      const acc=cs.answered?Math.round(cs.correct/cs.answered*100):0;
+      const done=cs.lastCheckin===today;
+      return `<div class="vt-row">
+        <span class="vt-nm">${esc(cs.name)} ${done?'<span class="vt-ok">今日✓</span>':'<span class="vt-no">今日✗</span>'}</span>
+        <span class="vt-st">${cs.answered||0}天 · 對${acc}% · 🔥${cs.streak||0} · ${cs.points||0}分 · ${fmtAgo(cs.updated)}</span>
+      </div>`;
+    }).join("");
+    html+=`<div class="vt-group"><div class="vt-gname">${esc(g.name)}</div>${rows}</div>`;
+  });
+  const extras=parts.filter(p=>!used.has(p.sid));
+  if(extras.length){
+    const rows=extras.map(cs=>{
+      const acc=cs.answered?Math.round(cs.correct/cs.answered*100):0;
+      const done=cs.lastCheckin===today;
+      return `<div class="vt-row"><span class="vt-nm">${esc(cs.name)} <span class="muted">(${esc(cs.team||'?')})</span> ${done?'<span class="vt-ok">今日✓</span>':'<span class="vt-no">今日✗</span>'}</span>
+        <span class="vt-st">${cs.answered||0}天 · 對${acc}% · 🔥${cs.streak||0} · ${cs.points||0}分</span></div>`;
+    }).join("");
+    html+=`<div class="vt-group"><div class="vt-gname">新加入（不在名單上）</div>${rows}</div>`;
+  }
+  if(parts.length===0) html+=`<div class="empty small" style="padding:16px">還沒有人作答。等大家開始就會出現在這裡。</div>`;
+  html+=`<button class="btn ghost" id="vtRefresh" style="margin-top:10px">🔄 重新整理看板</button>`;
+  return html;
+}
 function rosterEditHTML(){
   const groups=roster.map((g,gi)=>`
     <div class="admin-q" data-gi="${gi}">
@@ -1026,8 +1106,8 @@ function bindRosterEdit(){
   };
 }
 function askAdmin(){
-  showSheet(`<h2>老師管理 ⚙️</h2>
-    <p class="lead">輸入管理密碼進入（可設定開始日期、小組、每日題目）。</p>
+  showSheet(`<h2>VT 管理 ⚙️</h2>
+    <p class="lead">輸入管理密碼進入（可看全班進度、設定開始日期、小組、每日題目）。</p>
     <div class="field"><label>密碼</label><input class="input" id="admPw" type="password" placeholder="預設是 CONFIG 裡的密碼"></div>
     <button class="btn" id="admGo">進入</button>`);
   document.getElementById("admGo").onclick=()=>{
@@ -1047,7 +1127,11 @@ function adminPanel(){
     </div>`).join("") || '<p class="muted small">還沒有題目，往下新增第一題。</p>';
 
   showSheet(`
-    <h2>老師管理 ⚙️</h2>
+    <h2>VT 管理 ⚙️</h2>
+    <h2 style="font-size:18px;margin-top:8px">📊 教師看板</h2>
+    <p class="lead small" style="margin:6px 0 10px">全班即時進度、今天誰還沒做。</p>
+    ${renderVTDashboard()}
+    <hr class="sep">
     <div class="field"><label>計畫開始日期（第 1 天）</label>
       <input class="input" id="cfgStart" type="date" value="${runtimeConfig.START_DATE}"></div>
     <button class="btn ghost" id="cfgSave">儲存開始日期</button>
@@ -1085,6 +1169,7 @@ function adminPanel(){
     ${Cloud.on ? `
       <button class="btn ghost" id="cloudSeed" style="margin-top:10px">⬆️ 第一次設定：上傳名單＋題庫到雲端</button>
       <button class="btn ghost" id="cloudSyncQ" style="margin-top:8px">🔄 用檔案內建題庫更新雲端題目（加了新題目後按）</button>
+      <button class="btn ghost" id="cloudClear" style="margin-top:8px;color:var(--wrong)">🗑️ 清空全班分數（測試完重設用）</button>
     ` : ''}
     <div class="footnote" style="margin-top:16px">💡 之後要加整個月的題目：把題目給 Claude 加進檔案的 SEED_QUESTIONS，重新上傳檔案，再按上面的「🔄」一次即可（名單與分數不受影響）。</div>
   `);
@@ -1095,6 +1180,14 @@ function adminPanel(){
       alert("已用檔案題庫更新雲端 ✓");
     }
   };
+  const cc=document.getElementById("cloudClear"); if(cc) cc.onclick=async()=>{
+    if(!confirm("確定清空『全班所有人』的分數與答題紀錄？名單與題庫會保留，此動作無法復原。")) return;
+    if(!confirm("再確認一次：真的要清空全班分數嗎？")) return;
+    cc.disabled=true; cc.textContent="清除中…";
+    try{ await Cloud.clearAllStudents(); alert("已清空雲端全班分數 ✓\n\n提醒：每一台測試過的手機，請各自到「成就」分頁按『清除這台紀錄』，才不會又把舊分數傳回來。"); }
+    catch(e){ alert("清除失敗："+(e.message||e)); }
+    cc.disabled=false; cc.textContent="🗑️ 清空全班分數（測試完重設用）";
+  };
 
   // 設定
   document.getElementById("cfgSave").onclick=()=>{
@@ -1102,6 +1195,7 @@ function adminPanel(){
     DB.saveConfig({START_DATE:runtimeConfig.START_DATE}); alert("開始日期已儲存 ✓"); renderAll();
   };
   bindRosterEdit();
+  const vr=document.getElementById("vtRefresh"); if(vr) vr.onclick=()=>adminPanel();
   // 刪除
   document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
     if(confirm("刪除第 "+b.dataset.del+" 天的題目？")){ questions=questions.filter(q=>q.day!==+b.dataset.del); DB.saveQuestions(questions); adminPanel(); renderToday(); }
