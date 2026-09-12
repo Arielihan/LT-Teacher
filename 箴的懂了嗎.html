@@ -743,7 +743,7 @@ function renderAll(){
 function enterVTPreview(){
   state={ sid:"vt-preview", name:"VT（預覽）", team:(roster[0]&&roster[0].name)||"", zh:"", vt:true,
           points:0, streak:0, longest:0, lastCheckin:null, answered:0, correct:0, days:{}, badges:[] };
-  document.getElementById("statsBar").hidden=false;
+  document.getElementById("statsBar").hidden=true;
   closeSheet(); renderAll(); switchTab("today");
 }
 function exitVTPreview(){
@@ -754,9 +754,10 @@ function exitVTPreview(){
 }
 
 function renderStats(){
-  document.getElementById("stStreak").textContent=state.streak;
+   return; // 直接 return，不對 statsBar 做任何更新
+ /*document.getElementById("stStreak").textContent=state.streak;
   document.getElementById("stPts").textContent=state.points;
-  document.getElementById("stLv").textContent=levelOf(state.points).cur.em+" "+levelOf(state.points).cur.name;
+  document.getElementById("stLv").textContent=levelOf(state.points).cur.em+" "+levelOf(state.points).cur.name;*/
 }
 
 /* ---------- 今日 ---------- */
