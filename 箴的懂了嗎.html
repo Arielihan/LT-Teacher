@@ -737,6 +737,12 @@ function commitIdentity(name, team, zh, isOnboard){
 function renderAll(){
    // 👇 加這行：只有當 state.vt 為 true 時才顯示 vtBanner，否則隱藏
   document.getElementById("vtBanner").hidden = !state.vt;
+   // 取得 vtBanner 元素
+  const vtBanner = document.getElementById("vtBanner");
+  if (vtBanner) {
+    // 只有當 state.vt 為 true 時才顯示，其他所有狀況（包含點一般學生）一律隱藏
+    vtBanner.style.display = (state && state.vt) ? "block" : "none";
+  }
   const bn=document.getElementById("vtBanner");
   if(bn){ bn.hidden=!(state&&state.vt); const ex=document.getElementById("vtExit"); if(ex) ex.onclick=exitVTPreview; }
   renderStats(); renderToday(); renderRank(); renderMe();
