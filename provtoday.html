@@ -275,6 +275,11 @@ textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
 .team-name{font-weight:700;flex:1}
 .team-pts{font-family:var(--serif);font-weight:900;color:var(--gold)}
 .team-sub{font-size:11px;color:var(--ink-soft);margin-top:3px}
+.grade-block+.grade-block{margin-top:8px}
+.grade-title{font-size:14px;font-weight:800;color:var(--ink);margin:6px 2px 8px;padding:6px 10px;background:var(--gold-soft);border-radius:10px;display:inline-block}
+.grade-block .team-row:last-child{border-bottom:none}
+.grade-lab{font-size:13px;font-weight:800;color:var(--ink-soft);margin:12px 2px 8px}
+.grade-lab:first-child{margin-top:0}
 
 /* ---------- 對話框 / 覆蓋層 ---------- */
 .overlay{
@@ -768,6 +773,14 @@ const SEED_ROSTER = [
   { name:"Esther、Ariel", members:[] },
 ];
 
+/* 年段分組：國中小組 vs 高中小組（排行榜分開比，不合併） */
+const JHS_TEAMS = ["Angela、Eraw","Shanti、Diamonie","以憫、Jessica","David、Vicky"];
+/* 不顯示的小組（整組隱藏：報名、換組、排行榜都看不到）
+   註：只隱藏舊的「Gemma」殘留組，保留「Pastor Gemma」正式組 */
+const HIDDEN_TEAMS = ["Gemma","Gemma小組"];
+function isHiddenTeam(name){ return HIDDEN_TEAMS.includes(name); }
+function teamGrade(name){ return JHS_TEAMS.includes(name) ? "jhs" : "shs"; }
+
 /* =====================================================================
    等級（用你的「靈糧」比喻：從喝奶到吃乾糧）與徽章
    ===================================================================== */
@@ -922,7 +935,7 @@ let lang = "zh";   // 顯示語言：zh / en（只影響題目、經文等內容
 function isEn(){ return lang==="en"; }
 function qF(q,k){ return (isEn() && q[k+"En"]!=null) ? q[k+"En"] : q[k]; }        // 章/題/出處/經文
 function qOpts(q){ return (isEn() && q.optionsEn) ? q.optionsEn : q.options; }     // 選項陣列
-function syncTeams(){ runtimeConfig.TEAMS = roster.map(g=>g.name); }
+function syncTeams(){ runtimeConfig.TEAMS = roster.map(g=>g.name).filter(n=>!isHiddenTeam(n)); }
 function freshState(name, team, zh){
   return {
     sid: "s"+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),
@@ -989,9 +1002,13 @@ function switchTab(t){
    ===================================================================== */
 // 步驟一：選小組
 function groupStepHTML(title, lead){
-  const groups=roster.map(g=>`<button class="chip-pick" data-g="${esc(g.name)}" aria-pressed="false">${esc(g.name)}<span class="chip-sub">${g.members.length} 人</span></button>`).join("");
+  const visible=roster.filter(g=>!isHiddenTeam(g.name));
+  const chip=g=>`<button class="chip-pick" data-g="${esc(g.name)}" aria-pressed="false">${esc(g.name)}<span class="chip-sub">${g.members.length} 人</span></button>`;
+  const jhs=visible.filter(g=>teamGrade(g.name)==="jhs").map(chip).join("");
+  const shs=visible.filter(g=>teamGrade(g.name)==="shs").map(chip).join("");
+  const block=(label,html)=> html?`<div class="grade-lab">${label}</div><div class="chips grp">${html}</div>`:"";
   return `<h2>${title}</h2><p class="lead">${lead}</p>
-    <div class="field"><label>你的小組</label><div class="chips grp" id="grpPick">${groups}</div></div>`;
+    <div class="field"><label>你的小組</label><div id="grpPick">${block("🎒 國中小組",jhs)}${block("🎓 高中小組",shs)}</div></div>`;
 }
 function openOnboarding(){
   showSheet(groupStepHTML("歡迎來尋寶 📜","每天讀一章箴言、答一題、打一次卡。先選你在哪一組：")
@@ -1256,25 +1273,33 @@ function renderRank(){
       </div>`;
     }).join("");
   } else {
-    const teams={};
-    runtimeConfig.TEAMS.forEach(t=>teams[t]={name:t,total:0,n:0});
-    people.forEach(p=>{ if(!teams[p.team]) teams[p.team]={name:p.team,total:0,n:0}; teams[p.team].total+=p.points; teams[p.team].n+=1; });
-    const arr=Object.values(teams).sort((a,b)=>b.total-a.total);
-    const max=Math.max(1,...arr.map(t=>t.total));
+    // 國中、高中分開比，不合併排名
+    const buckets={jhs:{},shs:{}};
+    runtimeConfig.TEAMS.forEach(t=>{ if(isHiddenTeam(t))return; buckets[teamGrade(t)][t]={name:t,total:0,n:0}; });
+    people.forEach(p=>{ if(!p.team||isHiddenTeam(p.team))return; const gr=teamGrade(p.team);
+      if(!buckets[gr][p.team]) buckets[gr][p.team]={name:p.team,total:0,n:0};
+      buckets[gr][p.team].total+=p.points; buckets[gr][p.team].n+=1; });
     const colors=["var(--gold)","var(--sage)","var(--fire)","#7C6FD6"];
-    body.innerHTML=arr.map((t,i)=>{
-      const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"　";
-      const mine = t.name===state.team;
-      return `<div class="team-row">
-        <div class="team-top">
-          <span class="team-medal">${medal}</span>
-          <span class="team-name">${esc(t.name)}${mine?' <span class="muted small">（你的隊）</span>':''}</span>
-          <span class="team-pts tnum">${t.total}</span>
-        </div>
-        <div class="team-bar"><i style="width:${Math.round(t.total/max*100)}%;background:${colors[i%colors.length]}"></i></div>
-        <div class="team-sub">${t.n} 人 · 平均 ${t.n?Math.round(t.total/t.n):0} 分</div>
-      </div>`;
-    }).join("");
+    const renderGrade=(gr,label)=>{
+      const arr=Object.values(buckets[gr]).sort((a,b)=>b.total-a.total);
+      if(!arr.length) return "";
+      const max=Math.max(1,...arr.map(t=>t.total));
+      const rows=arr.map((t,i)=>{
+        const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"　";
+        const mine = t.name===state.team;
+        return `<div class="team-row">
+          <div class="team-top">
+            <span class="team-medal">${medal}</span>
+            <span class="team-name">${esc(t.name)}${mine?' <span class="muted small">（你的隊）</span>':''}</span>
+            <span class="team-pts tnum">${t.total}</span>
+          </div>
+          <div class="team-bar"><i style="width:${Math.round(t.total/max*100)}%;background:${colors[i%colors.length]}"></i></div>
+          <div class="team-sub">${t.n} 人 · 平均 ${t.n?Math.round(t.total/t.n):0} 分</div>
+        </div>`;
+      }).join("");
+      return `<div class="grade-block"><h3 class="grade-title">${label}</h3>${rows}</div>`;
+    };
+    body.innerHTML = renderGrade("jhs","🎒 國中小組") + renderGrade("shs","🎓 高中小組");
   }
 }
 // 我 + 全班（雲端連線時用真實資料；單機時用範例同學）
@@ -1390,7 +1415,7 @@ function renderVTDashboard(){
       <div class="vt-s"><b style="color:var(--fire)">${Math.max(0,parts.length-doneToday)}</b><span>今天還沒做</span></div>
     </div>`;
   const used=new Set();
-  roster.forEach(g=>{
+  roster.filter(g=>!isHiddenTeam(g.name)).forEach(g=>{
     const rows=g.members.map(m=>{
       const cs=parts.find(p=>p.team===g.name && !used.has(p.sid) && (p.name===m.en || p.name===m.zh));
       if(cs) used.add(cs.sid);
@@ -1405,7 +1430,7 @@ function renderVTDashboard(){
     }).join("");
     html+=`<div class="vt-group"><div class="vt-gname">${esc(g.name)}</div>${rows}</div>`;
   });
-  const extras=parts.filter(p=>!used.has(p.sid));
+  const extras=parts.filter(p=>!used.has(p.sid) && !isHiddenTeam(p.team));
   if(extras.length){
     const rows=extras.map(cs=>{
       const acc=cs.answered?Math.round(cs.correct/cs.answered*100):0;
@@ -1420,7 +1445,7 @@ function renderVTDashboard(){
   return html;
 }
 function rosterEditHTML(){
-  const groups=roster.map((g,gi)=>`
+  const groups=roster.map((g,gi)=> isHiddenTeam(g.name) ? "" : `
     <div class="admin-q" data-gi="${gi}">
       <div class="r1">
         <input class="input gname" data-gi="${gi}" value="${esc(g.name)}" style="flex:1;padding:8px 10px;font-size:14px">
