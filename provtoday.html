@@ -212,6 +212,25 @@ textarea{
 textarea:focus{outline:2px solid var(--gold);outline-offset:1px}
 .saved-tag{font-size:12px;color:var(--sage);font-weight:600;margin-top:6px;display:none}
 .saved-tag.show{display:block}
+/* ---------- 申論／討論題 ---------- */
+.essay-blocks{margin-top:12px}
+.essay-block{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+.essay-block:first-child{border-top:none;padding-top:0}
+.eb-title{font-weight:800;font-size:15.5px;color:var(--ink)}
+.eb-title-en{font-family:var(--sans);font-weight:600;font-size:13px;color:var(--ink-soft)}
+.eb-intro{font-size:14.5px;line-height:1.6;margin:6px 0 0}
+.eb-intro .txt-en{display:block}
+.eb-discuss{margin-top:10px}
+.eb-dhead{font-size:12.5px;font-weight:800;color:var(--gold);letter-spacing:.5px}
+.eb-discuss ul{margin:6px 0 0;padding-left:20px}
+.eb-discuss li{font-size:14.5px;line-height:1.55;margin:5px 0}
+.disc-en{font-family:var(--sans);font-size:12.5px;color:var(--ink-soft);line-height:1.4}
+.essay-answer{margin-top:16px;border-top:1px dashed var(--line);padding-top:14px}
+.essay-answer label{font-size:13px;font-weight:700;display:block;margin-bottom:6px}
+.essay-answer .hint{font-size:12px;color:var(--ink-soft);font-weight:400;margin-left:4px}
+.essay-answer textarea{min-height:110px}
+.essay-answer .btn{margin-top:10px}
+.essay-saved{white-space:pre-wrap;font-size:15px;line-height:1.6;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px}
 
 /* ---------- 進度 / 補讀清單 ---------- */
 .days{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
@@ -588,21 +607,34 @@ const SEED_QUESTIONS = [
     verse:"不輕易發怒的，大有聰明；性情暴躁的，大顯愚昧。",
     verseEn:"Whoever is patient has great understanding, but one who is quick-tempered displays folly." },
 
-  { day:15, chapter:"箴言 15 章", chapterEn:"Proverbs 15",
+  { day:15, type:"essay",
+    chapter:"主題討論 · 誘惑與選擇 / 驕傲與嫉妒", chapterEn:"Discussion · Temptation & Pride",
+    q:"看《納尼亞》艾德蒙的故事，讀經文、想一想，把你的想法打出來。",
+    qEn:"Reflect on Edmund's story in Narnia, read the verses, and type your thoughts.",
+    blocks:[
+      { title:"1. 誘惑與選擇", titleEn:"Temptation & Choice",
+        intro:"艾德蒙被土耳其軟糖誘惑。", introEn:"Edmund was tempted by the Turkish delight.",
+        ref:"箴言 1:10", refEn:"Proverbs 1:10",
+        verse:"我兒，惡人若引誘你，你不可隨從。",
+        verseEn:"My son, if sinful men entice you, do not give in to them.",
+        discuss:["艾德蒙真正想要的是糖果嗎？","為什麼人明知不對還會做？"],
+        discussEn:["Did Edmund really just want the candy?","Why do people do what they know is wrong?"] },
+      { title:"2. 驕傲與嫉妒", titleEn:"Pride & Jealousy",
+        intro:"艾德蒙一直想證明自己。", introEn:"Edmund kept wanting to prove himself.",
+        ref:"箴言 16:18", refEn:"Proverbs 16:18",
+        verse:"驕傲在敗壞以先；狂心在跌倒之前。",
+        verseEn:"Pride goes before destruction, a haughty spirit before a fall.",
+        discuss:["艾德蒙最大的問題是什麼？","嫉妒如何影響我們的判斷？"],
+        discussEn:["What was Edmund's biggest problem?","How does jealousy affect our judgment?"] },
+    ] },
+
+  { day:16, chapter:"箴言 15 章", chapterEn:"Proverbs 15",
     q:"關於責備與管教，下列何者為「非」？", qEn:"Which statement about correction is FALSE?",
     options:["耳聽使人得生命的責備，必居住在智慧人之中。","棄絕管教的，輕看自己的生命。","領受責備的，卻得自卑的心。","要得尊榮，先有謙卑。"],
     optionsEn:["Whoever heeds life-giving correction will be at home among the wise.","Those who disregard discipline despise themselves.","Those who accept correction gain a lowly, self-pitying heart.","Humility comes before honor."],
     answer:2, ref:"箴言 15:31-33", refEn:"Proverbs 15:31-33",
     verse:"領受責備的，卻得智慧的心。敬畏耶和華是智慧的訓誨；要得尊榮，先有謙卑。",
     verseEn:"The one who heeds correction gains understanding. Wisdom's instruction is to fear the LORD, and humility comes before honor." },
-
-  { day:16, chapter:"箴言 16 章", chapterEn:"Proverbs 16",
-    q:"控制自己脾氣的，比什麼更好？", qEn:"Controlling your temper is better than what?",
-    options:["擁有黃金","取一座城","痲瘋痊癒","吃飽睡好"],
-    optionsEn:["owning gold","taking a city","being healed of leprosy","eating and sleeping well"],
-    answer:1, ref:"箴言 16:32", refEn:"Proverbs 16:32",
-    verse:"不輕易發怒的，勝過勇士；控制自己脾氣的，強如取城。",
-    verseEn:"Better a patient person than a warrior, one with self-control than one who takes a city." },
 
   { day:17, chapter:"箴言 17 章", chapterEn:"Proverbs 17",
     q:"「喜樂的心乃是良藥；憂傷的靈使＿＿枯乾。」", qEn:"A cheerful heart is good medicine, but a crushed spirit dries up the ____.",
@@ -1132,8 +1164,12 @@ function renderToday(){
   }
 
   const ans=state.days[viewDay];
-  const opts=shuffledOptions(q,state.sid);
   const isToday=viewDay===cd;
+
+  // 申論／討論題：打字作答，有回答就得分（不分對錯）
+  if(q.type==="essay"){ renderEssayDay(host,q,viewDay,ans,isToday,chips); return; }
+
+  const opts=shuffledOptions(q,state.sid);
 
   let optHtml=opts.map((o,i)=>{
     const key=String.fromCharCode(65+i);
@@ -1184,6 +1220,103 @@ function renderToday(){
 }
 function bindDayChips(host){
   host.querySelectorAll("[data-goday]").forEach(b=>b.onclick=()=>{ host.dataset.viewDay=b.dataset.goday; renderToday(); });
+}
+
+/* ---------- 申論／討論題 ---------- */
+function renderEssayDay(host,q,viewDay,ans,isToday,chips){
+  const chapLine = `${esc(q.chapter)}${q.chapterEn?" · "+esc(q.chapterEn):""}`;
+  const qEnLine = q.qEn ? `<div class="q-text-en">${esc(q.qEn)}</div>` : "";
+  // 舊資料相容：以前存成單一 text，現在每段一個回答
+  const saved = ans ? (Array.isArray(ans.answers) ? ans.answers : (ans.text?[ans.text]:[])) : [];
+  const blocks=(q.blocks||[]).map((bk,bi)=>{
+    const disc=(bk.discuss||[]).map((d,i)=>{
+      const de=(bk.discussEn&&bk.discussEn[i])?`<div class="disc-en">${esc(bk.discussEn[i])}</div>`:"";
+      return `<li>${esc(d)}${de}</li>`;
+    }).join("");
+    // 每段討論後面各放一個作答框；答完後改成唯讀顯示
+    const answerZone = ans
+      ? `<div class="reflect" style="margin-top:10px"><label>你的回答 <span class="hint">（已儲存）</span></label>
+          <div class="essay-saved">${esc(saved[bi]||"")||'<span class="muted">（未填寫）</span>'}</div></div>`
+      : `<div class="essay-answer" style="margin-top:10px">
+          <label>把你的想法打出來 Type your thoughts</label>
+          <textarea class="essayBox" data-bi="${bi}" placeholder="寫下你的想法…（幾句話就可以）"></textarea>
+        </div>`;
+    return `<div class="essay-block">
+      <div class="eb-title">${esc(bk.title)}${bk.titleEn?` <span class="eb-title-en">${esc(bk.titleEn)}</span>`:""}</div>
+      ${bk.intro?`<p class="eb-intro">${esc(bk.intro)}${bk.introEn?`<span class="txt-en">${esc(bk.introEn)}</span>`:""}</p>`:""}
+      <div class="verse">
+        <div class="ref">📖 ${esc(bk.ref)}${bk.refEn?" · "+esc(bk.refEn):""}</div>
+        <div class="txt">「${esc(bk.verse)}」</div>
+        ${bk.verseEn?`<div class="txt-en">${esc(bk.verseEn)}</div>`:""}
+      </div>
+      <div class="eb-discuss"><div class="eb-dhead">💬 討論 Discuss</div><ul>${disc}</ul></div>
+      ${answerZone}
+    </div>`;
+  }).join("");
+
+  const gnote = (ans&&ans.gained) ? `+${ans.gained} 分`+(ans.bonus?`（含連續 🔥+${ans.bonus}）`:(ans.late?`（補做）`:``)) : ``;
+  const topBanner = ans ? `<div class="reveal" style="margin-top:14px"><div class="verdict ok">✍️ 已完成，謝謝你的分享！<span class="gained">${gnote}</span></div></div>` : "";
+  const submitBtn = ans ? "" : `<button class="btn" id="essaySubmit" style="margin-top:14px" disabled>送出 Submit（每天一次）</button>`;
+
+  host.innerHTML=`
+    <div class="card">
+      <div class="q-head">
+        <span class="q-day">${isToday?"今日靈糧 · ":""}第 ${viewDay} 天</span>
+        <span class="q-chapter">${chapLine}</span>
+      </div>
+      <div class="q-text">${esc(q.q)}</div>
+      ${qEnLine}
+      ${topBanner}
+      <div class="essay-blocks">${blocks}</div>
+      ${submitBtn}
+    </div>
+    <div class="card">
+      <div class="eyebrow">📅 我的進度 <span class="muted" style="font-weight:400;letter-spacing:0">· 點數字可補讀前幾天</span></div>
+      <div class="days">${chips}</div>
+    </div>`;
+
+  if(!ans){
+    const boxes=[...host.querySelectorAll(".essayBox")];
+    const btn=document.getElementById("essaySubmit");
+    const refresh=()=>{ btn.disabled = !boxes.some(t=>t.value.trim().length>0); };
+    boxes.forEach(t=>t.oninput=refresh);
+    btn.onclick=()=>submitEssay(viewDay, boxes.map(t=>t.value), isToday);
+  }
+  bindDayChips(host);
+}
+
+function submitEssay(day,answers,isToday){
+  answers=(answers||[]).map(a=>(a||"").trim());
+  if(!answers.some(a=>a)) return;   // 至少要有一段回答就能送出
+  const text=answers.filter(a=>a).join("\n\n");
+  const q=questions.find(x=>x.day===day);
+  const total=(q&&q.blocks?q.blocks.length:1)||1;
+  const filled=answers.filter(a=>a).length;
+  const frac=Math.min(1, filled/total);   // 填幾格就拿幾成：填一半只拿一半分
+  let gained, bonus=0;
+  if(isToday){
+    const t=todayTW();
+    if(state.lastCheckin!==t){
+      const prev=state.lastCheckin;
+      if(prev && prev>=runtimeConfig.START_DATE && diffDays(prev,t)===1) state.streak+=1;
+      else state.streak=1;
+      state.streak=Math.min(state.streak, Math.max(1,currentDay()));
+      state.lastCheckin=t;
+      state.longest=Math.max(state.longest,state.streak);
+    }
+    const fullBonus=Math.min(state.streak,CONFIG.STREAK_CAP);
+    gained=Math.round((CONFIG.PTS_CHECKIN + CONFIG.PTS_CORRECT + fullBonus) * frac);
+    bonus=Math.round(fullBonus * frac);
+  } else {
+    gained=Math.round((CONFIG.PTS_LATE_CHECKIN + CONFIG.PTS_LATE_CORRECT) * frac);
+  }
+  state.points+=gained;
+  state.answered+=1; state.correct+=1;   // 申論題：有回答就算完成（不分對錯）
+  state.days[day]={essay:true,answers,text,filled,total,correct:true,ts:Date.now(),reflection:"",gained,bonus,late:!isToday};
+  checkBadges();
+  DB.saveState(state);
+  renderStats(); renderToday(); renderRank(); renderMe();
+  burstConfetti();
 }
 
 function submitAnswer(day,sel,isToday){
@@ -1509,7 +1642,7 @@ function adminPanel(){
       <div class="r1"><span class="d">第 ${q.day} 天</span><span class="small muted">${esc(q.chapter)}</span>
         <button class="icon-btn small" style="margin-left:auto;width:30px;height:30px" data-del="${q.day}" title="刪除">🗑️</button></div>
       <div class="small">${esc(q.q)}</div>
-      <div class="small muted" style="margin-top:4px">✓ ${esc(q.options[q.answer])} ｜ ${esc(q.ref)}</div>
+      <div class="small muted" style="margin-top:4px">${q.type==="essay" ? "✍️ 討論題（申論，打字作答）" : "✓ "+esc(q.options[q.answer])+" ｜ "+esc(q.ref)}</div>
     </div>`).join("") || '<p class="muted small">還沒有題目，往下新增第一題。</p>';
 
   showSheet(`
@@ -1591,6 +1724,7 @@ function adminPanel(){
   document.querySelectorAll(".admin-q").forEach(el=>el.onclick=e=>{
     if(e.target.closest("[data-del]"))return;
     const q=questions.find(x=>x.day===+el.dataset.day); if(!q)return;
+    if(q.type==="essay"){ alert("這是討論／申論題，請直接在檔案的 SEED_QUESTIONS 裡編輯它的內容。"); return; }
     document.getElementById("qDay").value=q.day;
     document.getElementById("qChap").value=q.chapter;
     document.getElementById("qText").value=q.q;
